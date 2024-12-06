@@ -100,7 +100,7 @@
   "editor.minimap.enabled": false,
   "svelte.enable-ts-plugin": true,
   "editor.overviewRulerBorder": false,
-  "workbench.activityBar.location": "top",
+  "workbench.activityBar.location": "default",
   "extensions.experimental.affinity": {
     "better-ts-errors.better-ts-errors": 1
   },
