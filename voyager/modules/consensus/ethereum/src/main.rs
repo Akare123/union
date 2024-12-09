@@ -17,9 +17,14 @@ use jsonrpsee::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, instrument};
-use unionlabs::{hash::H160, ibc::core::client::height::Height, ErrorReporter};
+use unionlabs::{
+    hash::{H160, H256},
+    ibc::core::client::height::Height,
+    ErrorReporter,
+};
 use voyager_message::{
     core::{ChainId, ConsensusType},
+    into_value,
     module::{ConsensusModuleInfo, ConsensusModuleServer},
     ConsensusModule,
 };
@@ -54,6 +59,46 @@ pub struct Config {
     pub eth_rpc_api: String,
     /// The RPC endpoint for the beacon chain.
     pub eth_beacon_rpc_api: String,
+}
+
+impl Module {
+    // TODO: Deduplicate this from ethereum client-update plugin
+    async fn beacon_slot_of_execution_block_number(&self, block_number: u64) -> RpcResult<u64> {
+        let block = self
+            .provider
+            .get_block((block_number + 1).into(), BlockTransactionsKind::Hashes)
+            .await
+            .map_err(|e| {
+                ErrorObject::owned(
+                    -1,
+                    format!("error fetching block: {}", ErrorReporter(e)),
+                    None::<()>,
+                )
+            })?
+            .expect("block should exist");
+
+        let beacon_slot = self
+            .beacon_api_client
+            .block(
+                <H256>::from(
+                    block
+                        .header
+                        .parent_beacon_block_root
+                        .expect("parent beacon block root should exist"),
+                )
+                .into(),
+            )
+            .await
+            .map_err(|e| {
+                ErrorObject::owned(
+                    -1,
+                    format!("error fetching block: {}", ErrorReporter(e)),
+                    None::<()>,
+                )
+            })?;
+
+        Ok(beacon_slot.data.message.slot)
+    }
 }
 
 impl ConsensusModule for Module {
@@ -168,16 +213,32 @@ impl ConsensusModuleServer for Module {
     async fn self_consensus_state(&self, _: &Extensions, height: Height) -> RpcResult<Value> {
         let beacon_api_client = &self.beacon_api_client;
 
+        let beacon_slot = self
+            .beacon_slot_of_execution_block_number(height.height())
+            .await?;
+
         let trusted_header = beacon_api_client
-            .header(beacon_api::client::BlockId::Slot(height.height()))
+            .header(beacon_api::client::BlockId::Slot(beacon_slot))
             .await
-            .unwrap()
+            .map_err(|e| {
+                ErrorObject::owned(
+                    -1,
+                    format!("error fetching beacon header: {}", ErrorReporter(e)),
+                    None::<()>,
+                )
+            })?
             .data;
 
         let bootstrap = beacon_api_client
             .bootstrap(trusted_header.root)
             .await
-            .unwrap()
+            .map_err(|e| {
+                ErrorObject::owned(
+                    -1,
+                    format!("error fetching beacon bootstrap: {}", ErrorReporter(e)),
+                    None::<()>,
+                )
+            })?
             .data;
 
         let spec = self.beacon_api_client.spec().await.unwrap().data;
@@ -192,10 +253,23 @@ impl ConsensusModuleServer for Module {
             let light_client_updates = beacon_api_client
                 .light_client_updates(current_period, 1)
                 .await
-                .unwrap();
+                .map_err(|e| {
+                    ErrorObject::owned(
+                        -1,
+                        format!("error light client update: {}", ErrorReporter(e)),
+                        None::<()>,
+                    )
+                })?;
 
             let [light_client_update] = &*light_client_updates.0 else {
-                panic!()
+                return Err(ErrorObject::owned(
+                    -1,
+                    format!(
+                        "received invalid light client updates, expected \
+                        1 but received {light_client_updates:?}"
+                    ),
+                    None::<()>,
+                ));
             };
 
             light_client_update.data.clone()
@@ -204,7 +278,7 @@ impl ConsensusModuleServer for Module {
         // Normalize to nanos in order to be compliant with cosmos
         let timestamp = bootstrap.header.execution.timestamp * 1_000_000_000;
 
-        Ok(serde_json::to_value(ConsensusState {
+        Ok(into_value(ConsensusState {
             slot: bootstrap.header.beacon.slot,
             state_root: bootstrap.header.execution.state_root,
             storage_root: self
@@ -223,7 +297,6 @@ impl ConsensusModuleServer for Module {
                 .next_sync_committee
                 .unwrap()
                 .aggregate_pubkey,
-        })
-        .expect("infallible"))
+        }))
     }
 }
