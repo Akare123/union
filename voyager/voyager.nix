@@ -187,7 +187,7 @@
         let
           configJson = pkgs.writeText "config.json" (
             builtins.toJSON {
-              inherit (cfg) plugins;
+              inherit (cfg) plugins modules;
               voyager = cfg.voyager-extra // {
                 num_workers = cfg.workers;
                 queue = {
