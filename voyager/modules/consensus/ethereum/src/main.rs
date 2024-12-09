@@ -16,7 +16,7 @@ use jsonrpsee::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, trace};
 use unionlabs::{
     hash::{H160, H256},
     ibc::core::client::height::Height,
@@ -63,7 +63,10 @@ pub struct Config {
 
 impl Module {
     // TODO: Deduplicate this from ethereum client-update plugin
+    #[instrument(skip_all, fields(block_number))]
     async fn beacon_slot_of_execution_block_number(&self, block_number: u64) -> RpcResult<u64> {
+        trace!("fetching beacon slot of execution block {block_number}");
+
         let block = self
             .provider
             .get_block((block_number + 1).into(), BlockTransactionsKind::Hashes)
@@ -95,9 +98,14 @@ impl Module {
                     format!("error fetching block: {}", ErrorReporter(e)),
                     None::<()>,
                 )
-            })?;
+            })?
+            .data
+            .message
+            .slot;
 
-        Ok(beacon_slot.data.message.slot)
+        trace!("beacon slot of exution block {block_number} is {beacon_slot}");
+
+        Ok(beacon_slot)
     }
 }
 
@@ -139,7 +147,7 @@ impl ConsensusModule for Module {
 #[async_trait]
 impl ConsensusModuleServer for Module {
     /// Query the latest finalized height of this chain.
-    #[instrument(skip_all, fields(chain_id = %self.chain_id))]
+    #[instrument(skip_all, fields(chain_id = %self.chain_id, finalized))]
     async fn query_latest_height(&self, _: &Extensions, finalized: bool) -> RpcResult<Height> {
         if finalized {
             self.beacon_api_client
@@ -154,7 +162,7 @@ impl ConsensusModuleServer for Module {
 
     /// Query the latest finalized timestamp of this chain.
     // TODO: Use a better timestamp type here
-    #[instrument(skip_all, fields(chain_id = %self.chain_id))]
+    #[instrument(skip_all, fields(chain_id = %self.chain_id, finalized))]
     async fn query_latest_timestamp(&self, _: &Extensions, finalized: bool) -> RpcResult<i64> {
         if finalized {
             Ok(self
@@ -185,7 +193,7 @@ impl ConsensusModuleServer for Module {
         }
     }
 
-    #[instrument(skip_all, fields(chain_id = %self.chain_id))]
+    #[instrument(skip_all, fields(chain_id = %self.chain_id, %height))]
     async fn self_client_state(&self, _: &Extensions, height: Height) -> RpcResult<Value> {
         let genesis = self.beacon_api_client.genesis().await.unwrap().data;
 
@@ -209,15 +217,14 @@ impl ConsensusModuleServer for Module {
     }
 
     /// The consensus state on this chain at the specified `Height`.
-    #[instrument(skip_all, fields(chain_id = %self.chain_id))]
+    #[instrument(skip_all, fields(chain_id = %self.chain_id, %height))]
     async fn self_consensus_state(&self, _: &Extensions, height: Height) -> RpcResult<Value> {
-        let beacon_api_client = &self.beacon_api_client;
-
         let beacon_slot = self
             .beacon_slot_of_execution_block_number(height.height())
             .await?;
 
-        let trusted_header = beacon_api_client
+        let trusted_header = self
+            .beacon_api_client
             .header(beacon_api::client::BlockId::Slot(beacon_slot))
             .await
             .map_err(|e| {
@@ -229,7 +236,8 @@ impl ConsensusModuleServer for Module {
             })?
             .data;
 
-        let bootstrap = beacon_api_client
+        let bootstrap = self
+            .beacon_api_client
             .bootstrap(trusted_header.root)
             .await
             .map_err(|e| {
@@ -243,20 +251,21 @@ impl ConsensusModuleServer for Module {
 
         let spec = self.beacon_api_client.spec().await.unwrap().data;
 
-        assert!(bootstrap.header.beacon.slot == height.height());
+        assert_eq!(bootstrap.header.execution.block_number, height.height());
 
         let light_client_update = {
-            let current_period = height.height().div(spec.period());
+            let current_period = beacon_slot.div(spec.period());
 
             debug!(%current_period);
 
-            let light_client_updates = beacon_api_client
+            let light_client_updates = self
+                .beacon_api_client
                 .light_client_updates(current_period, 1)
                 .await
                 .map_err(|e| {
                     ErrorObject::owned(
                         -1,
-                        format!("error light client update: {}", ErrorReporter(e)),
+                        format!("error fetching light client update: {}", ErrorReporter(e)),
                         None::<()>,
                     )
                 })?;
@@ -299,4 +308,20 @@ impl ConsensusModuleServer for Module {
                 .aggregate_pubkey,
         }))
     }
+}
+
+#[tokio::test]
+async fn block() {
+    let provider: RootProvider<BoxTransport> = ProviderBuilder::new()
+        .on_builtin("https://eth-sepolia.g.alchemy.com/v2/MS7UF39itji9IWEiJBISExWgEGtEGbs7")
+        .await
+        .unwrap();
+
+    let block = provider
+        .get_block(7246001.into(), BlockTransactionsKind::Hashes)
+        .await
+        .unwrap()
+        .expect("block should exist");
+
+    dbg!(&block);
 }

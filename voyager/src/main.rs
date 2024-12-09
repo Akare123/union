@@ -685,6 +685,11 @@ pub mod utils {
         ibc_spec_id: IbcSpecId,
         metadata: Value,
     ) -> anyhow::Result<Op<VoyagerMessage>> {
+        if height == QueryHeight::Latest {
+            // TODO: Also check if a specific height was passed and ensure that that height is also finalized
+            bail!("cannot create a client at a non-finalized height")
+        }
+
         let height = ctx
             .rpc_server
             .query_height(&counterparty_chain_id, height)
