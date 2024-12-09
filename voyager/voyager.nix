@@ -203,30 +203,18 @@
           );
         in
         mkIf cfg.enable {
+        environment.systemPackages = [
+          (pkgs.writeShellApplication {
+              name = "voyager";
+              runtimeInputs = [ cfg.package ];
+              text = ''
+                ${pkgs.lib.getExe cfg.package} --config-file-path ${configJson} "$@"
+              '';
+          })
+        ];
           systemd.services = {
-            # voyager-migration = {
-            #   wantedBy = [ "multi-user.target" ];
-            #   after = [ "network.target" ];
-            #   description = "Voyager Migration";
-            #   serviceConfig = {
-            #     Type = "oneshot";
-            #     ExecStart = ''
-            #       ${pkgs.lib.meta.getExe cfg.package} \
-            #         --config-file-path ${configJson} \
-            #         -l ${cfg.log-format} \
-            #         run-migrations
-            #     '';
-            #   };
-            #   environment = {
-            #     RUST_LOG = "debug";
-            #     RUST_BACKTRACE = "full";
-            #   };
-            # };
             voyager = {
               wantedBy = [ "multi-user.target" ];
-              # after = [ "voyager-migration.service" ];
-              # partOf = [ "voyager-migration.service" ];
-              # requires = [ "voyager-migration.service" ];
               description = "Voyager";
               serviceConfig = {
                 Type = "simple";
