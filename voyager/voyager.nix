@@ -236,7 +236,7 @@
                     -l ${cfg.log-format} ${
                       pkgs.lib.optionalString (cfg.stack-size != null) "--stack-size ${toString cfg.stack-size}"
                     } \
-                    relay
+                    start
                 '';
                 Restart = mkForce "always";
                 RestartSec = 10;
