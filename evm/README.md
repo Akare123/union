@@ -64,6 +64,17 @@ Production contracts will get solely upgraded through the proxy and have the sam
 - UCS02: [0xcd83BFe45F4bc25Db2A153D6Aba40B99a2D90C61](https://sepolia.etherscan.io/address/0xcd83BFe45F4bc25Db2A153D6Aba40B99a2D90C61)
 - Multicall: [0xa4Cb22b21fD3701797218324A3425d50e12E66Cd](https://sepolia.etherscan.io/address/0xa4Cb22b21fD3701797218324A3425d50e12E66Cd)
 
+### Holesky
+
+- Deployer: [0x8473C8A647f7EEE80dE978251DAEfD6EFa63ED7C](https://holesky.etherscan.io/address/0x8473C8A647f7EEE80dE978251DAEfD6EFa63ED7C)
+- Sender: [0x153919669Edc8A5D0c8D1E4507c9CE60435A1177](https://holesky.etherscan.io/address/0x153919669Edc8A5D0c8D1E4507c9CE60435A1177)
+- IBCHandler: [0xE3e97964d842623D2Da087978Fbe343523D810B2](https://holesky.etherscan.io/address/0xE3e97964d842623D2Da087978Fbe343523D810B2)
+- CometblsClient: [0xbFFc83e32Bd9428f00bE562e5608DB945c7fF475](https://holesky.etherscan.io/address/0xbFFc83e32Bd9428f00bE562e5608DB945c7fF475)
+- UCS00: [0xf81158aC87f2cdc8543E40aBD8Fe8Ad1efe50e5e](https://holesky.etherscan.io/address/0xf81158aC87f2cdc8543E40aBD8Fe8Ad1efe50e5e)
+- UCS01: [0x3188A9D9a3AdfaFf95074dfBF14ed3ab6C3C0B6E](https://holesky.etherscan.io/address/0x3188A9D9a3AdfaFf95074dfBF14ed3ab6C3C0B6E)
+- UCS02: [0xcd83BFe45F4bc25Db2A153D6Aba40B99a2D90C61](https://holesky.etherscan.io/address/0xcd83BFe45F4bc25Db2A153D6Aba40B99a2D90C61)
+- Multicall: [0xa4Cb22b21fD3701797218324A3425d50e12E66Cd](https://holesky.etherscan.io/address/0xa4Cb22b21fD3701797218324A3425d50e12E66Cd)
+
 ### Berachain
 
 - Deployer: [0x17425b7d2d97E613dE2ADa01Dc472F76879E08Fe](https://bartio.beratrail.io/address/0x17425b7d2d97E613dE2ADa01Dc472F76879E08Fe)
