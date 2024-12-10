@@ -507,7 +507,10 @@ async fn do_main(args: cli::AppArgs) -> anyhow::Result<()> {
                     height,
                     decode,
                 } => {
-                    let ibc_handlers = [(IbcClassic::ID, IbcSpecHandler::new::<IbcClassic>())]
+                    let ibc_handlers = [
+                            (IbcClassic::ID, IbcSpecHandler::new::<IbcClassic>()),
+                            (IbcUnion::ID, IbcSpecHandler::new::<IbcUnion>())
+                         ]
                         .into_iter()
                         .collect::<HashMap<_, _>>();
 
